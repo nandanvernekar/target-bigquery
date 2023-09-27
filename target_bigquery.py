@@ -64,20 +64,23 @@ def define_schema(field, name):
                 schema_mode = 'NULLABLE'
             else:
                 field = types
-            
-    if isinstance(field['type'], list):
-        if field['type'][0] == "null":
-            schema_mode = 'NULLABLE'
+
+    if 'type' in field:
+        if isinstance(field['type'], list):
+            if field['type'][0] == "null":
+                schema_mode = 'NULLABLE'
+            else:
+                schema_mode = 'required'
+            schema_type = field['type'][1]
         else:
-            schema_mode = 'required'
-        schema_type = field['type'][-1]
-    else:
-        schema_type = field['type']
+            schema_type = field['type']
     if schema_type == "object":
         schema_type = "RECORD"
         schema_fields = tuple(build_schema(field))
     if schema_type == "array":
         schema_type = field.get('items').get('type')
+        if isinstance(schema_type, list):
+            schema_type = schema_type[-1] #https://github.com/RealSelf/target-bigquery/pull/17/commits/c52488441229cda5acd17b911e922e25e7469604
         schema_mode = "REPEATED"
         if schema_type == "object":
           schema_type = "RECORD"
@@ -97,11 +100,6 @@ def define_schema(field, name):
 def build_schema(schema):
     SCHEMA = []
     for key in schema['properties'].keys():
-        
-        if not (bool(schema['properties'][key])):
-            # if we endup with an empty record.
-            continue
-
         schema_name, schema_type, schema_mode, schema_description, schema_fields = define_schema(schema['properties'][key], key)
         SCHEMA.append(SchemaField(schema_name, schema_type, schema_mode, schema_description, schema_fields))
 
@@ -258,10 +256,9 @@ def persist_lines_stream(project_id, dataset_id, lines=None, validate_records=Tr
 
     for table in errors.keys():
         if not errors[table]:
-            logging.info('Loaded {} row(s) into {}:{}'.format(rows[table], dataset_id, table, tables[table].path))
-            emit_state(state)
+            print('Loaded {} row(s) into {}:{}'.format(rows[table], dataset_id, table), tables[table].path)
         else:
-            logging.error('Errors:', errors[table], sep=" ")
+            print('Errors:', errors[table], sep=" ")
 
     return state
 
